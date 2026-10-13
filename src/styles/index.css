@@ -1,3 +1,44 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --color-game-bg: #271422;
+  --color-game-surface: #331a2c;
+  --color-game-card: #3f2237;
+  --color-game-card-hover: #4c2943;
+  --color-game-border: rgba(255, 255, 255, 0.08);
+  --color-game-pink: #e8618c;
+  --color-game-pink-hover: #f3739c;
+  --color-game-gold: #f6c344;
+}
+
+/* Custom scrollbars para los paneles de cartas */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(39, 20, 34, 0.6);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(232, 97, 140, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(232, 97, 140, 0.7);
+}
+
+/* Animaciones sutiles del juego */
+@keyframes floatTape {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+.tape-indicator {
+  animation: floatTape 2.5s ease-in-out infinite;
+}
