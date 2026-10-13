@@ -1,7 +1,7 @@
 // src/components/ui/panels/FabricPanel.tsx
 import React, { useState } from 'react';
 import { useGameStore, FABRICS, FabricItem } from '../../../store/useGameStore';
-import { Sparkles, ArrowRight, ArrowLeft, Coins, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Coins, Check, Sparkles } from 'lucide-react';
 
 export const FabricPanel: React.FC = () => {
   const selectedFabric = useGameStore((s) => s.selectedFabric);
@@ -33,7 +33,7 @@ export const FabricPanel: React.FC = () => {
             🧵
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-white">Selección de Telas</h2>
+            <h2 className="text-xl font-extrabold text-white">Telas & Estampados</h2>
           </div>
         </div>
         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#261321] border border-white/5 text-xs font-bold text-[#f6c344]">
@@ -43,16 +43,16 @@ export const FabricPanel: React.FC = () => {
       </div>
 
       <p className="text-[11px] text-[#c49db9]">
-        Escoge el tejido ideal para confeccionar la prenda. Cada tela aporta textura y propiedades únicas a la prenda final.
+        Elige un tejido de alta costura con textura y estampado real. Cada tela transfiere su diseño al maniquí 3D y a la mesa de corte.
       </p>
 
       {errorMsg && (
-        <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs text-center font-bold animate-shake">
+        <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs text-center font-bold">
           {errorMsg}
         </div>
       )}
 
-      {/* Grid de telas */}
+      {/* Grid de telas con vista previa de su patrón */}
       <div className="grid grid-cols-2 gap-2.5">
         {FABRICS.map((fabric) => {
           const isSelected = selectedFabric.id === fabric.id;
@@ -66,19 +66,30 @@ export const FabricPanel: React.FC = () => {
               onClick={() => handleSelect(fabric)}
               className={`relative flex flex-col p-3 rounded-2xl border text-left transition-all ${
                 isSelected
-                  ? 'border-[#e8618c] bg-[#e8618c]/15 shadow-md shadow-pink-500/20 ring-2 ring-[#e8618c]/30'
+                  ? 'border-[#e8618c] bg-[#e8618c]/15 shadow-md shadow-pink-500/20 ring-2 ring-[#e8618c]/40'
                   : canAfford
                   ? 'border-white/5 bg-[#3f2237] hover:border-white/20'
                   : 'border-white/5 bg-[#261321] opacity-40 cursor-not-allowed'
               }`}
             >
-              {/* Muestra circular de color de tela con textura */}
               <div className="flex items-center justify-between mb-2">
+                {/* Muestra circular con simulación del patrón textil real */}
                 <div
-                  className="w-8 h-8 rounded-full border-2 border-white/20 shadow-md flex items-center justify-center"
-                  style={{ backgroundColor: fabric.color }}
+                  className="w-10 h-10 rounded-xl border-2 border-white/20 shadow-md flex items-center justify-center overflow-hidden"
+                  style={{
+                    backgroundColor: fabric.baseColor,
+                    backgroundImage:
+                      fabric.patternType === 'vichy'
+                        ? `repeating-linear-gradient(0deg, transparent, transparent 8px, rgba(232,97,140,0.5) 8px, rgba(232,97,140,0.5) 16px), repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(232,97,140,0.5) 8px, rgba(232,97,140,0.5) 16px)`
+                        : fabric.patternType === 'polka'
+                        ? `radial-gradient(#ffffff 25%, transparent 25%)`
+                        : fabric.patternType === 'linen'
+                        ? `repeating-linear-gradient(45deg, rgba(0,0,0,0.08) 0, rgba(0,0,0,0.08) 2px, transparent 2px, transparent 4px)`
+                        : 'none',
+                    backgroundSize: fabric.patternType === 'polka' ? '14px 14px' : 'auto'
+                  }}
                 >
-                  {isSelected && <Check className="w-4 h-4 text-white stroke-[3] drop-shadow" />}
+                  {isSelected && <Check className="w-5 h-5 text-white stroke-[3] drop-shadow" />}
                 </div>
 
                 <div className="flex items-center gap-1 text-xs font-bold text-[#f6c344]">
@@ -93,14 +104,12 @@ export const FabricPanel: React.FC = () => {
                 </div>
               </div>
 
-              <span className="text-xs font-bold text-white mb-1">{fabric.name}</span>
+              <span className="text-xs font-bold text-white mb-1 line-clamp-1">{fabric.name}</span>
 
-              {/* Tag de la tela */}
+              {/* Tag de compatibilidad con el cliente */}
               <span
                 className={`text-[9px] px-1.5 py-0.5 rounded-md self-start font-semibold ${
-                  matchesClient
-                    ? 'bg-[#e8618c] text-white'
-                    : 'bg-black/30 text-[#c49db9]'
+                  matchesClient ? 'bg-[#e8618c] text-white' : 'bg-black/30 text-[#c49db9]'
                 }`}
               >
                 {fabric.tag}
@@ -111,11 +120,10 @@ export const FabricPanel: React.FC = () => {
       </div>
 
       {/* Botones de Navegación */}
-      <div className="flex gap-2 pt-2">
+      <div className="flex gap-2 pt-1">
         <button
           onClick={prevPhase}
           className="p-3.5 rounded-2xl bg-[#3f2237] hover:bg-[#4d2a44] text-[#c49db9] hover:text-white transition-all flex items-center justify-center border border-white/5"
-          title="Volver al diseño"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -124,7 +132,7 @@ export const FabricPanel: React.FC = () => {
           onClick={nextPhase}
           className="flex-1 py-3.5 rounded-2xl bg-[#f6c344] hover:bg-[#ffd152] text-[#261321] font-black text-sm tracking-wide uppercase flex items-center justify-center gap-2 shadow-xl shadow-amber-400/20 active:scale-95 transition-all"
         >
-          <span>Siguiente: Cortar Patrón</span>
+          <span>Siguiente: Mesa de Corte 2D</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

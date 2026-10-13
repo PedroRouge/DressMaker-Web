@@ -1,6 +1,6 @@
 // src/App.tsx
 import React, { useState } from 'react';
-import { useGameStore } from './store/useGameStore';
+import { useGameStore, GamePhase } from './store/useGameStore';
 import { GameScene } from './components/3d/GameScene';
 
 // Paneles de UI
@@ -8,11 +8,12 @@ import { OrderPanel } from './components/ui/panels/OrderPanel';
 import { MeasurePanel } from './components/ui/panels/MeasurePanel';
 import { DesignPanel } from './components/ui/panels/DesignPanel';
 import { FabricPanel } from './components/ui/panels/FabricPanel';
-import { CutPanel } from './components/ui/panels/CutPanel';
-import { SewingMinigame } from './components/ui/panels/SewingMinigame';
+import { CuttingTable } from './components/ui/panels/CuttingTable';
+import { SewingMachine } from './components/ui/panels/SewingMachine';
+import { DecoratePanel } from './components/ui/panels/DecoratePanel';
 import { DeliveryPanel } from './components/ui/panels/DeliveryPanel';
 
-import { Coins, Star, HelpCircle, Eye, EyeOff, Maximize, RotateCcw } from 'lucide-react';
+import { Coins, Star, HelpCircle, Eye, EyeOff } from 'lucide-react';
 
 export const App: React.FC = () => {
   const phase = useGameStore((s) => s.phase);
@@ -25,14 +26,15 @@ export const App: React.FC = () => {
   const [hideUI, setHideUI] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
-  const PHASES_LIST = [
+  const PHASES_LIST: { id: GamePhase; label: string; icon: string }[] = [
     { id: 'MEASURE', label: 'Medir', icon: '📏' },
     { id: 'DESIGN', label: 'Diseñar', icon: '🌸' },
     { id: 'FABRIC', label: 'Telas', icon: '🧵' },
     { id: 'CUT', label: 'Cortar', icon: '✂️' },
     { id: 'SEW', label: 'Coser', icon: '🪡' },
+    { id: 'DECORATE', label: 'Detalles', icon: '🪄' },
     { id: 'DELIVERY', label: 'Entregar', icon: '🎁' }
-  ] as const;
+  ];
 
   const partNames = {
     bust: 'Pecho',
@@ -43,9 +45,9 @@ export const App: React.FC = () => {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#261321] text-[#f7eef5] select-none flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       {/* =========================================================================
-          BARRA SUPERIOR (NAVBAR IDÉNTICA A DRESSMAKER)
+          BARRA SUPERIOR (NAVBAR OFICIAL DE DRESSMAKER)
          ========================================================================= */}
-      <header className="z-30 w-full flex items-center justify-between px-4 py-3 sm:px-6">
+      <header className="z-30 w-full flex items-center justify-between px-3 py-2.5 sm:px-6 sm:py-3">
         {/* Pastilla de Fases del Juego (Izquierda) */}
         <div className="flex items-center gap-1 sm:gap-2 bg-[#311b2b]/95 border border-white/10 px-3 py-1.5 rounded-full shadow-lg backdrop-blur-md">
           {PHASES_LIST.map((p, idx) => {
@@ -54,14 +56,14 @@ export const App: React.FC = () => {
               <React.Fragment key={p.id}>
                 <button
                   onClick={() => setPhase(p.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold transition-all ${
                     isActive
                       ? 'bg-[#e8618c] text-white shadow-md shadow-pink-500/30 scale-105'
                       : 'text-[#9c7891] hover:text-[#d3b4cb]'
                   }`}
                 >
                   <span>{p.icon}</span>
-                  <span className={isActive ? 'inline' : 'hidden md:inline'}>{p.label}</span>
+                  <span className={isActive ? 'inline' : 'hidden lg:inline'}>{p.label}</span>
                 </button>
                 {idx < PHASES_LIST.length - 1 && (
                   <span className="text-[#59344f] text-[10px] hidden sm:inline">··</span>
@@ -74,7 +76,7 @@ export const App: React.FC = () => {
         {/* Monedas, Reputación y Botones de Acción (Derecha) */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Contador de Monedas y Estrellas */}
-          <div className="flex items-center gap-3 bg-[#311b2b]/95 border border-white/10 px-4 py-1.5 rounded-full shadow-md text-xs font-black">
+          <div className="flex items-center gap-3 bg-[#311b2b]/95 border border-white/10 px-3.5 py-1.5 rounded-full shadow-md text-xs font-black">
             <div className="flex items-center gap-1.5 text-[#f6c344]">
               <Coins className="w-4 h-4 fill-[#f6c344]" />
               <span>{coins}</span>
@@ -109,7 +111,7 @@ export const App: React.FC = () => {
           CONTENIDO PRINCIPAL: MOTOR 3D (IZQUIERDA) + PANEL DE FASE (DERECHA)
          ========================================================================= */}
       <main className="relative flex-1 w-full h-full flex flex-col lg:flex-row overflow-hidden">
-        {/* MITAD IZQUIERDA / FONDO: CANVAS 3D INTERACTIVO CON MANIQUÍ */}
+        {/* MITAD IZQUIERDA / FONDO: CANVAS 3D INTERACTIVO */}
         <div className="relative flex-1 w-full h-full">
           <GameScene />
 
@@ -130,7 +132,7 @@ export const App: React.FC = () => {
             </div>
           )}
 
-          {/* Pie de página sutil como en el juego original */}
+          {/* Pie de página sutil del juego */}
           <div className="absolute bottom-3 left-4 text-[10px] text-[#805f77] pointer-events-none">
             Guardado en este navegador
           </div>
@@ -139,12 +141,13 @@ export const App: React.FC = () => {
         {/* MITAD DERECHA: PANEL MODULAR CONDICIONAL SEGÚN FASE */}
         {!hideUI && (
           <aside className="z-20 w-full lg:w-auto p-4 sm:p-6 flex items-center justify-center lg:justify-end">
-            {phase === 'START' && <OrderPanel />}
+            {(phase === 'START' || phase === 'ORDER') && <OrderPanel />}
             {phase === 'MEASURE' && <MeasurePanel />}
             {phase === 'DESIGN' && <DesignPanel />}
             {phase === 'FABRIC' && <FabricPanel />}
-            {phase === 'CUT' && <CutPanel />}
-            {phase === 'SEW' && <SewingMinigame />}
+            {phase === 'CUT' && <CuttingTable />}
+            {phase === 'SEW' && <SewingMachine />}
+            {phase === 'DECORATE' && <DecoratePanel />}
             {phase === 'DELIVERY' && <DeliveryPanel />}
           </aside>
         )}
@@ -163,7 +166,7 @@ export const App: React.FC = () => {
               </h3>
               <button
                 onClick={() => setShowHelpModal(false)}
-                className="text-[#c49db9] hover:text-white font-bold"
+                className="text-[#c49db9] hover:text-white font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -171,27 +174,30 @@ export const App: React.FC = () => {
 
             <div className="space-y-2.5 text-xs text-[#d3b4cb]">
               <p>
-                <strong>1. Medir:</strong> Ajusta el contorno de pecho, cintura y cadera con la cinta métrica en el maniquí.
+                <strong>1. Medir con Precisión:</strong> Ajusta la cinta milimétrica para obtener el 100% de coincidencia con las medidas del cliente.
               </p>
               <p>
-                <strong>2. Diseñar:</strong> Selecciona el corpiño, escote y falda adaptándote a las etiquetas solicitadas por el cliente.
+                <strong>2. Diseñar:</strong> Combina corpiños y faldas (tubo, evasé, plisada) buscando los tags que pide el encargo.
               </p>
               <p>
-                <strong>3. Telas:</strong> Compra la tela que mejor encaje con el pedido para maximizar tus propinas.
+                <strong>3. Telas Reales:</strong> Selecciona estampados vichy, flores botánicas, lino con trama o brocado damasco.
               </p>
               <p>
-                <strong>4. Cortar y Coser:</strong> Recorta el patrón y consigue puntadas perfectas en el minijuego de costura.
+                <strong>4. Mesa de Corte 2D:</strong> Ubica los patrones en el tapete verde y usa las tijeras para cortar las piezas.
               </p>
               <p>
-                <strong>5. Entregar:</strong> ¡Recibe tus monedas 🪙 y gana estrellas de reputación ⭐!
+                <strong>5. Máquina 3D:</strong> Elige modo Automático o Manual (mantén ESPACIO y guía con flechas ←/→).
+              </p>
+              <p>
+                <strong>6. Detalles y Entrega:</strong> Decora con botones de nácar o lazos y cobra tu recompensa con propina por precisión.
               </p>
             </div>
 
             <button
               onClick={() => setShowHelpModal(false)}
-              className="w-full py-2.5 rounded-xl bg-[#e8618c] text-white font-bold text-xs uppercase"
+              className="w-full py-2.5 rounded-xl bg-[#e8618c] text-white font-bold text-xs uppercase cursor-pointer hover:bg-[#f3739c]"
             >
-              ¡Entendido!
+              ¡A Confeccionar!
             </button>
           </div>
         </div>

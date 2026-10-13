@@ -1,7 +1,16 @@
 // src/store/useGameStore.ts
 import { create } from 'zustand';
 
-export type GamePhase = 'START' | 'MEASURE' | 'DESIGN' | 'FABRIC' | 'CUT' | 'SEW' | 'DELIVERY';
+export type GamePhase =
+  | 'START'
+  | 'ORDER'
+  | 'MEASURE'
+  | 'DESIGN'
+  | 'FABRIC'
+  | 'CUT'
+  | 'SEW'
+  | 'DECORATE'
+  | 'DELIVERY';
 
 export interface ClientOrder {
   id: string;
@@ -12,7 +21,11 @@ export interface ClientOrder {
   requiredTags: string[];
   budget: number;
   rewardStars: number;
-  deadlineMinutes: number;
+  targetMeasurements: {
+    bust: number;
+    waist: number;
+    hips: number;
+  };
 }
 
 export interface Measurements {
@@ -23,7 +36,7 @@ export interface Measurements {
 
 export interface DesignChoice {
   cut: 'entallado' | 'recto' | 'peplum' | 'imperio';
-  skirtLength: 'corta' | 'midi' | 'larga';
+  skirtStyle: 'tubo' | 'evase' | 'plisada';
   neckline: 'redondo' | 'cuadrado' | 'enV' | 'corazon' | 'barco';
   sleeve: 'sin_mangas' | 'corta' | 'abullonada';
   tags: string[];
@@ -32,35 +45,53 @@ export interface DesignChoice {
 export interface FabricItem {
   id: string;
   name: string;
-  color: string;
+  patternType: 'vichy' | 'floral' | 'linen' | 'polka' | 'damask';
+  baseColor: string;
+  secondaryColor: string;
   price: number;
   roughness: number;
   metalness: number;
   tag: string;
 }
 
+export interface DecorationChoice {
+  buttons: boolean; // Botones de nácar frontales
+  bow: boolean;     // Lazo de satén en la cintura
+  lace: boolean;    // Encaje floral en el dobladillo
+  brooch: boolean;  // Broche de oro en el escote
+}
+
 interface GameState {
-  // Estado base del juego
   phase: GamePhase;
   coins: number;
   stars: number;
   currentOrder: ClientOrder;
-  
-  // Medición
+
+  // Medición y Precisión
   measurements: Measurements;
   activeMeasurePart: 'bust' | 'waist' | 'hips';
   tempMeasureValue: number;
+  measureAccuracy: number; // Porcentaje calculado
 
-  // Diseño
+  // Diseño y Telas
   design: DesignChoice;
-
-  // Tela & Patronaje
   selectedFabric: FabricItem;
-  cutProgress: number;
 
-  // Costura (Minijuego 2D)
-  sewingScore: number;
-  sewingStitches: number;
+  // Mesa de Corte 2D
+  cutPiecesPlaced: { bodiceFront: boolean; bodiceBack: boolean; skirt: boolean };
+  isCuttingAnimated: boolean;
+  cutProgress: number;
+  cutAccuracy: number;
+
+  // Mesa de Costura 3D / 2D
+  sewingMode: 'auto' | 'manual';
+  sewingNeedleActive: boolean;
+  sewingLineProgress: number; // 0 - 100
+  sewingDeviance: number;     // Desvío en modo manual
+  sewingAccuracy: number;     // % final
+
+  // Decoraciones
+  decorations: DecorationChoice;
 
   // Acciones
   setPhase: (phase: GamePhase) => void;
@@ -77,84 +108,191 @@ interface GameState {
 
   // Acciones de Diseño
   setCut: (cut: DesignChoice['cut'], tags: string[]) => void;
-  setSkirtLength: (length: DesignChoice['skirtLength'], tags: string[]) => void;
+  setSkirtStyle: (style: DesignChoice['skirtStyle'], tags: string[]) => void;
   setNeckline: (neckline: DesignChoice['neckline']) => void;
   setSleeve: (sleeve: DesignChoice['sleeve']) => void;
-
-  // Acciones de Tela
   selectFabric: (fabric: FabricItem) => boolean;
 
-  // Acciones de Corte y Costura
-  setCutProgress: (prog: number) => void;
-  addStitch: (quality: 'PERFECT' | 'GOOD' | 'MISS') => void;
+  // Acciones de Corte
+  placePatternPiece: (piece: 'bodiceFront' | 'bodiceBack' | 'skirt') => void;
+  triggerCutAnimation: () => void;
 
-  // Reiniciar juego / Nuevo cliente
+  // Acciones de Costura
+  setSewingMode: (mode: 'auto' | 'manual') => void;
+  advanceSewing: (devianceOffset?: number) => void;
+
+  // Acciones de Decoración
+  toggleDecoration: (key: keyof DecorationChoice) => void;
+
+  // Reiniciar
   resetGame: () => void;
 }
 
 export const FABRICS: FabricItem[] = [
-  { id: 'lino-crudo', name: 'Lino Atelier Crudo', color: '#ebdccb', price: 0, roughness: 0.9, metalness: 0.05, tag: 'vintage' },
-  { id: 'seda-rosa', name: 'Seda Rosa Romántica', color: '#f3a6b8', price: 30, roughness: 0.25, metalness: 0.35, tag: 'romántico' },
-  { id: 'terciopelo-vino', name: 'Terciopelo Borgoña', color: '#681c2f', price: 45, roughness: 0.85, metalness: 0.1, tag: 'glamuroso' },
-  { id: 'satén-marfil', name: 'Satén Marfil', color: '#fdfbf7', price: 25, roughness: 0.2, metalness: 0.4, tag: 'profesional' },
-  { id: 'medianoche', name: 'Crepé Azul Noche', color: '#1e272e', price: 40, roughness: 0.6, metalness: 0.15, tag: 'minimalista' },
-  { id: 'esmeralda', name: 'Brocado Esmeralda', color: '#10ac84', price: 50, roughness: 0.4, metalness: 0.3, tag: 'vintage' }
+  {
+    id: 'lino-crudo',
+    name: 'Lino Atelier con Trama',
+    patternType: 'linen',
+    baseColor: '#ebdccb',
+    secondaryColor: '#dfcfbe',
+    price: 0,
+    roughness: 0.9,
+    metalness: 0.05,
+    tag: 'vintage'
+  },
+  {
+    id: 'vichy-rosa',
+    name: 'Algodón Vichy a Cuadros',
+    patternType: 'vichy',
+    baseColor: '#f8d7da',
+    secondaryColor: '#e8618c',
+    price: 35,
+    roughness: 0.65,
+    metalness: 0.1,
+    tag: 'romántico'
+  },
+  {
+    id: 'floral-primavera',
+    name: 'Batista Floral Botánica',
+    patternType: 'floral',
+    baseColor: '#fbf7f4',
+    secondaryColor: '#e55039',
+    price: 45,
+    roughness: 0.5,
+    metalness: 0.15,
+    tag: 'romántico'
+  },
+  {
+    id: 'polka-vintage',
+    name: 'Algodón Lunares Retro',
+    patternType: 'polka',
+    baseColor: '#2c3e50',
+    secondaryColor: '#ffffff',
+    price: 30,
+    roughness: 0.6,
+    metalness: 0.1,
+    tag: 'vintage'
+  },
+  {
+    id: 'damasco-oro',
+    name: 'Brocado Damasco Imperial',
+    patternType: 'damask',
+    baseColor: '#1e272e',
+    secondaryColor: '#f6c344',
+    price: 60,
+    roughness: 0.35,
+    metalness: 0.45,
+    tag: 'glamuroso'
+  }
 ];
 
-const INITIAL_ORDER: ClientOrder = {
-  id: 'order-1',
-  clientName: 'Elena Rostova',
-  avatar: '👩🏼',
-  occasion: 'Banquete de Primavera',
-  description: 'Deseo un vestido sofisticado con un aire vintage y romántico. ¡Confío en tu criterio para la silueta!',
-  requiredTags: ['vintage', 'romántico'],
-  budget: 120,
-  rewardStars: 2,
-  deadlineMinutes: 10
-};
+const DEFAULT_ORDERS: ClientOrder[] = [
+  {
+    id: 'order-1',
+    clientName: 'Valeria Delacroix',
+    avatar: '👩🏻‍🦰',
+    occasion: 'Gala de Alta Sociedad',
+    description: 'Necesito un vestido entallado con tela de textura exquisita y aire vintage. ¡El calce debe ser milimétrico!',
+    requiredTags: ['vintage', 'glamuroso'],
+    budget: 160,
+    rewardStars: 3,
+    targetMeasurements: {
+      bust: 90.0,
+      waist: 68.0,
+      hips: 95.0
+    }
+  },
+  {
+    id: 'order-2',
+    clientName: 'Camila Visconti',
+    avatar: '👱🏻‍♀️',
+    occasion: 'Boda de Verano',
+    description: 'Busco algo romántico con caída vaporosa y estampados delicados.',
+    requiredTags: ['romántico', 'vintage'],
+    budget: 140,
+    rewardStars: 2,
+    targetMeasurements: {
+      bust: 86.5,
+      waist: 64.0,
+      hips: 92.0
+    }
+  }
+];
 
 export const useGameStore = create<GameState>((set, get) => ({
   phase: 'START',
   coins: 150,
   stars: 3,
-  currentOrder: INITIAL_ORDER,
+  currentOrder: DEFAULT_ORDERS[0],
 
-  measurements: {
-    bust: null,
-    waist: null,
-    hips: null
-  },
+  measurements: { bust: null, waist: null, hips: null },
   activeMeasurePart: 'bust',
-  tempMeasureValue: 88.3,
+  tempMeasureValue: 90.0,
+  measureAccuracy: 100,
 
   design: {
     cut: 'entallado',
-    skirtLength: 'midi',
-    neckline: 'redondo',
+    skirtStyle: 'evase',
+    neckline: 'corazon',
     sleeve: 'sin_mangas',
-    tags: ['glamuroso', 'romántico']
+    tags: ['glamuroso', 'vintage']
   },
 
-  selectedFabric: FABRICS[0],
+  selectedFabric: FABRICS[1], // Vichy de inicio
+
+  cutPiecesPlaced: { bodiceFront: false, bodiceBack: false, skirt: false },
+  isCuttingAnimated: false,
   cutProgress: 0,
-  sewingScore: 0,
-  sewingStitches: 0,
+  cutAccuracy: 95,
+
+  sewingMode: 'manual',
+  sewingNeedleActive: false,
+  sewingLineProgress: 0,
+  sewingDeviance: 0,
+  sewingAccuracy: 100,
+
+  decorations: {
+    buttons: true,
+    bow: false,
+    lace: false,
+    brooch: false
+  },
 
   setPhase: (phase) => set({ phase }),
 
   nextPhase: () => {
-    const phases: GamePhase[] = ['START', 'MEASURE', 'DESIGN', 'FABRIC', 'CUT', 'SEW', 'DELIVERY'];
-    const currentIdx = phases.indexOf(get().phase);
-    if (currentIdx < phases.length - 1) {
-      set({ phase: phases[currentIdx + 1] });
+    const phases: GamePhase[] = [
+      'START',
+      'ORDER',
+      'MEASURE',
+      'DESIGN',
+      'FABRIC',
+      'CUT',
+      'SEW',
+      'DECORATE',
+      'DELIVERY'
+    ];
+    const idx = phases.indexOf(get().phase);
+    if (idx < phases.length - 1) {
+      set({ phase: phases[idx + 1] });
     }
   },
 
   prevPhase: () => {
-    const phases: GamePhase[] = ['START', 'MEASURE', 'DESIGN', 'FABRIC', 'CUT', 'SEW', 'DELIVERY'];
-    const currentIdx = phases.indexOf(get().phase);
-    if (currentIdx > 0) {
-      set({ phase: phases[currentIdx - 1] });
+    const phases: GamePhase[] = [
+      'START',
+      'ORDER',
+      'MEASURE',
+      'DESIGN',
+      'FABRIC',
+      'CUT',
+      'SEW',
+      'DECORATE',
+      'DELIVERY'
+    ];
+    const idx = phases.indexOf(get().phase);
+    if (idx > 0) {
+      set({ phase: phases[idx - 1] });
     }
   },
 
@@ -163,38 +301,37 @@ export const useGameStore = create<GameState>((set, get) => ({
   setOrder: (order) => set({ currentOrder: order }),
 
   setActiveMeasurePart: (part) => {
-    const current = get().measurements[part];
-    let defaultVal = 88.3;
-    if (part === 'waist') defaultVal = 65.4;
-    if (part === 'hips') defaultVal = 94.2;
+    const { measurements, currentOrder } = get();
+    const current = measurements[part];
+    const target = currentOrder.targetMeasurements[part];
     set({
       activeMeasurePart: part,
-      tempMeasureValue: current !== null ? current : defaultVal
+      tempMeasureValue: current !== null ? current : target - 1.5 + Math.random() * 3
     });
   },
 
   setTempMeasureValue: (val) => set({ tempMeasureValue: parseFloat(val.toFixed(1)) }),
 
   lockMeasurement: () => {
-    const { activeMeasurePart, tempMeasureValue, measurements } = get();
+    const { activeMeasurePart, tempMeasureValue, measurements, currentOrder } = get();
     const updated = { ...measurements, [activeMeasurePart]: tempMeasureValue };
 
-    // Siguiente parte a medir automáticamente
-    let nextPart: 'bust' | 'waist' | 'hips' = activeMeasurePart;
-    let nextVal = 65.4;
-    if (activeMeasurePart === 'bust' && !updated.waist) {
-      nextPart = 'waist';
-      nextVal = 65.4;
-    } else if (activeMeasurePart === 'waist' && !updated.hips) {
-      nextPart = 'hips';
-      nextVal = 94.2;
-    }
+    // Cálculo de precisión respecto a la medida real del cliente
+    const target = currentOrder.targetMeasurements[activeMeasurePart];
+    const diff = Math.abs(tempMeasureValue - target);
+    const accuracyForPart = Math.max(50, Math.min(100, 100 - diff * 8));
 
-    set({
+    // Promedio de precisión
+    let nextPart: 'bust' | 'waist' | 'hips' = activeMeasurePart;
+    if (activeMeasurePart === 'bust' && !updated.waist) nextPart = 'waist';
+    else if (activeMeasurePart === 'waist' && !updated.hips) nextPart = 'hips';
+
+    set((s) => ({
       measurements: updated,
       activeMeasurePart: nextPart,
-      tempMeasureValue: updated[nextPart] !== null ? updated[nextPart]! : nextVal
-    });
+      tempMeasureValue: updated[nextPart] !== null ? updated[nextPart]! : currentOrder.targetMeasurements[nextPart],
+      measureAccuracy: Math.round((s.measureAccuracy + accuracyForPart) / 2)
+    }));
   },
 
   setCut: (cut, tags) => {
@@ -203,96 +340,80 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
 
-  setSkirtLength: (skirtLength, tags) => {
+  setSkirtStyle: (skirtStyle, tags) => {
     set((s) => ({
-      design: { ...s.design, skirtLength, tags: Array.from(new Set([...s.design.tags, ...tags])) }
+      design: { ...s.design, skirtStyle, tags: Array.from(new Set([...s.design.tags, ...tags])) }
     }));
   },
 
-  setNeckline: (neckline) => {
-    set((s) => ({
-      design: { ...s.design, neckline }
-    }));
-  },
-
-  setSleeve: (sleeve) => {
-    set((s) => ({
-      design: { ...s.design, sleeve }
-    }));
-  },
+  setNeckline: (neckline) => set((s) => ({ design: { ...s.design, neckline } })),
+  setSleeve: (sleeve) => set((s) => ({ design: { ...s.design, sleeve } })),
 
   selectFabric: (fabric) => {
     const { coins } = get();
     if (coins >= fabric.price) {
-      set({
-        selectedFabric: fabric,
-        coins: coins - fabric.price
-      });
+      set({ selectedFabric: fabric, coins: coins - fabric.price });
       return true;
     }
     return false;
   },
 
-  setCutProgress: (prog) => set({ cutProgress: Math.min(100, Math.max(0, prog)) }),
+  placePatternPiece: (piece) => {
+    set((s) => ({
+      cutPiecesPlaced: { ...s.cutPiecesPlaced, [piece]: true }
+    }));
+  },
 
-  addStitch: (quality) => {
+  triggerCutAnimation: () => {
+    set({ isCuttingAnimated: true, cutProgress: 0 });
+    let p = 0;
+    const interval = setInterval(() => {
+      p += 5;
+      if (p >= 100) {
+        clearInterval(interval);
+        set({ isCuttingAnimated: false, cutProgress: 100 });
+      } else {
+        set({ cutProgress: p });
+      }
+    }, 45);
+  },
+
+  setSewingMode: (mode) => set({ sewingMode: mode }),
+
+  advanceSewing: (devianceOffset = 0) => {
     set((s) => {
-      let bonus = 10;
-      if (quality === 'PERFECT') bonus = 25;
-      if (quality === 'GOOD') bonus = 15;
-      if (quality === 'MISS') bonus = -5;
+      const nextProg = Math.min(100, s.sewingLineProgress + 4);
+      const penalty = Math.abs(devianceOffset) > 4 ? 3 : 0;
       return {
-        sewingScore: Math.max(0, s.sewingScore + bonus),
-        sewingStitches: s.sewingStitches + 1
+        sewingLineProgress: nextProg,
+        sewingNeedleActive: nextProg < 100,
+        sewingDeviance: devianceOffset,
+        sewingAccuracy: Math.max(40, s.sewingAccuracy - penalty)
       };
     });
   },
 
+  toggleDecoration: (key) => {
+    set((s) => ({
+      decorations: { ...s.decorations, [key]: !s.decorations[key] }
+    }));
+  },
+
   resetGame: () => {
-    const newClients: ClientOrder[] = [
-      {
-        id: 'order-2',
-        clientName: 'Valeria Dupont',
-        avatar: '👩🏻‍🦰',
-        occasion: 'Cóctel en la Ópera',
-        description: 'Busco algo glamuroso y entallado, con telas de calidad.',
-        requiredTags: ['glamuroso', 'profesional'],
-        budget: 150,
-        rewardStars: 3,
-        deadlineMinutes: 12
-      },
-      {
-        id: 'order-3',
-        clientName: 'Camila Morales',
-        avatar: '👱🏻‍♀️',
-        occasion: 'Boda en el Jardín',
-        description: 'Un look romántico y fluido con un corte cómodo y delicado.',
-        requiredTags: ['romántico', 'vintage'],
-        budget: 135,
-        rewardStars: 2,
-        deadlineMinutes: 8
-      }
-    ];
-
-    const randomClient = newClients[Math.floor(Math.random() * newClients.length)];
-
+    const nextOrder =
+      DEFAULT_ORDERS[Math.floor(Math.random() * DEFAULT_ORDERS.length)];
     set({
-      phase: 'START',
-      currentOrder: randomClient,
+      phase: 'ORDER',
+      currentOrder: nextOrder,
       measurements: { bust: null, waist: null, hips: null },
       activeMeasurePart: 'bust',
-      tempMeasureValue: 88.3,
-      design: {
-        cut: 'entallado',
-        skirtLength: 'midi',
-        neckline: 'redondo',
-        sleeve: 'sin_mangas',
-        tags: ['glamuroso', 'romántico']
-      },
-      selectedFabric: FABRICS[0],
+      tempMeasureValue: nextOrder.targetMeasurements.bust,
+      measureAccuracy: 100,
+      cutPiecesPlaced: { bodiceFront: false, bodiceBack: false, skirt: false },
       cutProgress: 0,
-      sewingScore: 0,
-      sewingStitches: 0
+      sewingLineProgress: 0,
+      sewingAccuracy: 100,
+      decorations: { buttons: true, bow: false, lace: false, brooch: false }
     });
   }
 }));
