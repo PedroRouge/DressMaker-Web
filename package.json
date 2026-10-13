@@ -1,0 +1,30 @@
+{
+  "name": "dressmaker-web",
+  "version": "1.0.0",
+  "description": "DressMaker – juego 3D de diseño de ropa en el navegador usando Three.js y React-Three-Fiber",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": ["react","vite","threejs","react-three-fiber","zustand","tailwindcss","dressmaker"],
+  "author": "Your Name <you@example.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@react-three/drei": "^9.104.0",
+    "@react-three/fiber": "^8.15.7",
+    "immer": "^10.1.1",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.18",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.1",
+    "vite": "^5.2.11"
+  }
+}
