@@ -1,31 +1,76 @@
-import create from 'zustand';
+import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
-/**
- * Estado global del juego.
- * - loading: indica si los assets están listos.
- * - cameraPosition: posición inicial de la cámara.
- * - outfits: array de outfits creados (placeholder).
- */
 export const useGameStore = create(
-  immer((set, get) => ({
-    loading: true,
-    cameraPosition: [0, 2, 5],
-    outfits: [],
+  immer((set) => ({
+    loading: false,
+    cameraPosition: [0, 1.2, 3.8],
+    dressColor: '#e056fd',
+    secondaryColor: '#f368e0',
+    fabricType: 'satin',
+    dressCut: 'flair', // 'flair' | 'sleek' | 'princess'
+    hasBelt: true,
+    hasNecklace: true,
+    autoRotate: true,
+    savedDesigns: [],
 
-    // Inicializa el juego (carga assets, etc.)
-    initialize: async () => {
-      // Simular carga (puedes reemplazar por loaders reales)
-      await new Promise((res) => setTimeout(res, 800));
+    setDressColor: (color) => {
       set((state) => {
-        state.loading = false;
+        state.dressColor = color;
       });
     },
 
-    // Añade un outfit al array (ejemplo de acción de store)
-    addOutfit: (outfit) => {
+    setSecondaryColor: (color) => {
       set((state) => {
-        state.outfits.push(outfit);
+        state.secondaryColor = color;
+      });
+    },
+
+    setFabricType: (fabric) => {
+      set((state) => {
+        state.fabricType = fabric;
+      });
+    },
+
+    setDressCut: (cut) => {
+      set((state) => {
+        state.dressCut = cut;
+      });
+    },
+
+    toggleBelt: () => {
+      set((state) => {
+        state.hasBelt = !state.hasBelt;
+      });
+    },
+
+    toggleNecklace: () => {
+      set((state) => {
+        state.hasNecklace = !state.hasNecklace;
+      });
+    },
+
+    toggleAutoRotate: () => {
+      set((state) => {
+        state.autoRotate = !state.autoRotate;
+      });
+    },
+
+    saveCurrentDesign: () => {
+      set((state) => {
+        state.savedDesigns.push({
+          id: Date.now(),
+          color: state.dressColor,
+          fabric: state.fabricType,
+          cut: state.dressCut,
+          createdAt: new Date().toLocaleTimeString()
+        });
+      });
+    },
+
+    initialize: async () => {
+      set((state) => {
+        state.loading = false;
       });
     }
   }))
